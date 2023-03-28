@@ -8,7 +8,53 @@ Author: Kokhta Shukvani
 Version: 0.1
 Author URI:
 */
+ini_set('display_errors', 0); ini_set('display_startup_errors', 0); error_reporting(E_ERROR);
 
+function link_silo_create_db() {
+
+    global $wpdb;
+    $charset_collate = $wpdb->get_charset_collate();
+    $table_name = $wpdb->prefix . 'linksilo_files';
+    $table_name2 = $wpdb->prefix . 'linksilo_links';
+
+    $sql = "	  	CREATE TABLE `$table_name` (
+ `id` int(11) NOT NULL AUTO_INCREMENT,
+ `filename` varchar(300) NOT NULL ,
+ `fileurl` varchar(1000) NOT NULL,
+ `upload_date` varchar(100) NOT NULL DEFAULT current_timestamp(),
+ `status` int(11) NOT NULL DEFAULT 0,
+ PRIMARY KEY (`id`)
+) $charset_collate;
+";
+
+    require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
+    dbDelta( $sql );
+}
+function link_silo_create_db_2() {
+
+    global $wpdb;
+    $charset_collate = $wpdb->get_charset_collate();
+    $table_name = $wpdb->prefix . 'linksilo_files';
+    $table_name2 = $wpdb->prefix . 'linksilo_links';
+
+    $sql = "	 CREATE TABLE `$table_name2` (
+ `linkid` int(11) NOT NULL AUTO_INCREMENT,
+ `fileid` int(11) DEFAULT NULL,
+ `post_id` int(11) DEFAULT NULL,
+ `forward_posts_id` varchar(300) NOT NULL,
+ `backward_post_id` varchar(300) NOT NULL,
+ `created_date` varchar(100) NOT NULL DEFAULT current_timestamp(),
+ `status` int(11) NOT NULL DEFAULT 0,
+ PRIMARY KEY (`linkid`)
+	                      ) $charset_collate
+;
+";
+
+    require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
+    dbDelta( $sql );
+}
+register_activation_hook( __FILE__, 'link_silo_create_db' );
+register_activation_hook( __FILE__, 'link_silo_create_db_2' );
 function my_content_filter($content){
     //this is where we will implement our filter
 
@@ -29,7 +75,6 @@ function my_content_filter($content){
                     }
     $content .= "</div>";
 
-//    echo "<script>alert('". get_post_meta(get_the_ID(),'linkedTO',true)."')</script>";
     return $content;
 }
 add_filter( 'the_content', 'my_content_filter' );
@@ -44,7 +89,14 @@ function SiloAdminCSS(){
 }
 function LinkSilo_plugin_setup_menu(){
 
-    add_menu_page( 'LinkSilo Plugin Page', '<div class="wp-menu-name" style="font-weight: 600;color: darkslategrey;box-shadow: 0 0 45px -16px inset #0083ffb3;text-shadow: 0 0 0px #114576;color: white;letter-spacing: 0.6;text-decoration-line: underline;text-transform: capitalize;text-decoration-thickness: 1px;width: 100%;position: absolute;left: 0;top: 0;width: 118px;top: 2px;left: -5px;text-decoration-color: lightslategray;transition:300ms">LinkSilo Plugin</div>    <style>.wp-menu-image *  {transition: 600ms;transition-timing-function: ease-in-out;margin-top: 3px;}</style>', 'manage_options', 'LinkSilo-plugin', 'LinkSilo_init','/wp-content/plugins/Link_Silo_Pro/assets/backlinkico.png',6 );
+    /** @noinspection CssInvalidPropertyValue */
+    add_menu_page( 'LinkSilo Plugin Page', '<div class="wp-menu-name" style="font-weight: 600;color: darkslategrey;box-shadow: 0 0 45px -16px inset #0083ffb3;text-shadow: 0 0 0px #114576;color: white;letter-spacing: 0.6;text-decoration-line: underline;text-transform: capitalize;text-decoration-thickness: 1px;width: 100%;position: absolute;left: 0;top: 0;width: 118px;top: 2px;left: -5px;text-decoration-color: lightslategray;transition:300ms">LinkSilo Plugin</div>    <style>.wp-menu-image *  {transition: 600ms;transition-timing-function: ease-in-out;margin-top: 3px;}</style>', 'manage_options', 'LinkSilo-plugin', 'LinkSilo_init', '/wp-content/plugins/Link_Silo_Pro/assets/backlinkico.png', 6 );
+    add_submenu_page('LinkSilo-plugin', 'Live Editor', 'Live Editor', 'manage_options', 'live_editor', 'LinkSilo_Live_Editor');
+    add_submenu_page('LinkSilo-plugin', 'CSV History', 'CSV History', 'manage_options', 'csv_history', 'LinkSilo_CSV_History');
+}
+
+function LinkSilo_CSV_History()
+{
 }
 function LinkSilo_init(){
 ini_set('display_errors', 0); ini_set('display_startup_errors', 0); error_reporting(E_ERROR);
@@ -376,12 +428,20 @@ echo "<div id='mainCont'>";
     <?php
     if(isset($_POST['upload']))
     {
-        $Script="";
+    ini_set('display_errors', 1); ini_set('display_startup_errors', 1); error_reporting(E_ERROR);
+
+    $Script="";
         if( ! empty( $_FILES ) )
         {
             $file=$_FILES['file'];
             $attachment_id = upload_user_file( $file );
             $CsvUrl=     wp_get_attachment_url($attachment_id);
+            $filename=explode('/',$CsvUrl);
+            $filename=$filename[count($filename)-1];
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'linksilo_files';
+    $wpdb->insert($table_name, array('filename' => $filename, 'fileurl' => $CsvUrl));
+
 //            $CsvUrl='http://127.0.0.1/wp-content/uploads/2023/03/coop-34.csv';
 
             $CSVfp = fopen($CsvUrl, "r");
@@ -419,19 +479,10 @@ echo "<div id='mainCont'>";
 //$i++;
 
                         global $wpdb,$post;
-//                        $data[2] = esc_sql($data[2]);
-                   $tt=     str_replace("’","'", $data[2]);
-                   $tt=     str_replace("\"","'", $data[2]);
-                    /*    $mypostss = $wpdb->get_results( "SELECT * FROM $wpdb->posts WHERE post_type='post' and post_status ='published';" );
-                        foreach ($mypostss as $item){
-                            $new_title=  str_replace( "'","’", $item->post_title);
-                              afunction( $item, $new_title );
-                        }*/
 
                         $StrSearch=str_replace('"','',$data[2]);
                         global $wpdb,$post;
                         $myposts = $wpdb->get_results( $wpdb->prepare("SELECT * FROM $wpdb->posts WHERE  post_status ='publish' and post_type='post' and post_title LIKE '%s'", '%'. $wpdb->esc_like( $StrSearch ) .'%') );
-//var_dump($myposts);
 //                        $myposts = $wpdb->get_results( "SELECT * FROM $wpdb->posts WHERE post_status='publish' and post_type='post' and post_title LIKE  %s \"%" .    $data[2]   ."%\"" );
 //var_dump($myposts);
 //echo "SELECT * FROM $wpdb->posts WHERE post_status='publish' and post_type='post' and post_title LIKE \"%" .   $data[2]  ."%\"";
@@ -451,62 +502,12 @@ echo "<div id='mainCont'>";
                             $gg++;
                             echo "<h1 style='color:yellow;font-size: 10px;text-align: left;margin-left: 10rem;'>".$item->post_title."</h1>";
                             $post_id = $item->ID;
-                            $Script .="  {    name: '".$item->post_title."',value:1}";
 
-                            //      echo  $item->ID;
-                        /*    $V++;
-                            $post_content = $item->post_content;
-                         //   $Silos[$data[2]]['posts'][$V]['PostID']['id']=$post_id;
-                           // $Silos[$data[2]]['posts'][$V]['IsExist']='no';
-//                                echo "<h1>" . $post_id` . "</h1>";
-
-                            $data = array(
-                                'ID' => $post_id,
-                                'post_content' => $post_content . "<br> <a id='LinkSilo' href='" . $data[1] . "'>" . $data[0] . "</a>",
-
-                            );
-
-                            wp_update_post($data);
-                            if(str_contains(strtolower( 'LinkSilo'),strtolower( $post_content)))
-                            {
-//                                $Silos[$data[2]]['posts'][$V]['PostID']['id']=$post_id;
-//                                $Silos[$data[2]]['posts'][$V]['IsExist']='no';
-//                            /    echo "<h1>" . $post_id` . "</h1>";
-
-                                $data = array(
-                                    'ID' => $post_id,
-                                    'post_content' => $post_content . "<br> <a id='LinkSilo' href='" . $data[1] . "'>" . $data[0] . "</a>",
-
-                                );
-
-                                wp_update_post($data);
-                            }
-                            /*else{
-
-//                                $Silos[$data[2]]['posts'][$V]['PostID']=$post_id;
-//                                $Silos[$data[2]]['posts'][$V]['IsExist']='Yes';
-//                                echo "<h1>Already Exist</h1>";
-                            }*/
-
-//                            echo "<br/></pre>";
                         }
 
-
-//                        */
-
-//                        $i++;
-                        $Script .= "],";
-//                        echo "<pre style='width:500px;height:500px   ;overflow: scroll'>";
-//var_dump($Silos);
-
-//                        echo "</pre>";
                         ?>
 
                     <?php }
-//                    for ($B;$B++;$B <= count($Silos)){
-//
-//                    }
-
                     ?>
 
                     <?php
@@ -514,104 +515,14 @@ echo "<div id='mainCont'>";
 
                     $i++;
 
-                }
-//var_dump($Silos);
-
-//                echo "<pre>";var_dump($Silos);
-//                $gg=0;
-//                var_dump($Silos);
-//var_dump($SSDD);
-//                var_dump($FDFD);
-                /*
-                                foreach ($SSDD as $silo) {
-                //                    var_dump($Silos=>);
-                                   echo $silo->ReplacementText;
-                var_dump();
-                                  //  echo "<pre>";var_dump( $silo);echo "</pre><h1>End Section</h1><br><BR>";
-                //                    echo "<script>alert   ('<PRE>""</pre>>')</script>";
-                                  if ($gg > 0){$Script .= "";}
-                                  $gg++;
-                //                  if (strlen($silo[1]['SearchPhrase']) > 2)
-                                  {
-                                   $Script .=   "
-
-
-
-                            name: '".$silo[1]['SearchPhrase']."',
-                            fixed: true,
-
-                                children: [";
-                                                        $PP=0;
-                                                        foreach ($silo['posts'] as $post__id) {
-                                                        if ($PP> 0) $Script .= ",";
-                                                        $PP++;
-                                    //                        echo  "<h1>". var_dump($post__id['PostID']) . "</h1>";
-                                                       //    echo get_the_title($post__id['PostID']);
-
-
-                                                        //echo "<h1>". $silo[1]['SearchPhrase'] . "</h1>";
-                                                            $Script .= "
-                                                   { name: '".get_the_title($post__id['PostID'])."', value: 1 }
-                                          ";
-                                                        }
-
-                                $Script .= "]  ";
-                          $Script .= "  ";
-                                    foreach ($silo as $item) {
-                //            echo "<pre>";                       var_dump($item);
-                                  }
-                //                    $Script .= "]";
-                                }
-                                */?>
+                }?>
 
 
                 <div class="phppot-container">
 
                     <?php
-                    /*
+                ?>
 
-                                            while (! feof($CSVfp)) {
-                                                $data = fgetcsv($CSVfp, 1000, ",");
-                                                if (! empty($data)) {
-                                                    echo "<div class='Sections'><h3 class='Sectionh3'>Results For : \"".$data[0]."\"</h3>";
-                                                    // Start Post Search
-
-
-                                                    global $wpdb,$post;
-                                                    $myposts = $wpdb->get_results( $wpdb->prepare("SELECT * FROM $wpdb->posts WHERE post_title LIKE '%s'", '%'. $wpdb->esc_like(  $data[2] ) .'%') );
-                    //var_dump($myposts);
-
-                                                    foreach ($myposts as $item) {
-                                                       echo  $item->ID;
-
-                                                       echo $post_content = $item->post_content;
-                                                      if(str_contains(strtolower( $data[0]),strtolower( $post_content))) {
-                                                          $post_id = $item->ID;
-
-                                                          echo "<h1>" . $post_id . "</h1>";
-
-                                                          $data = array(
-                                                              'ID' => $post_id,
-                                                              'post_content' => $post_content . "<br> <a href='" . $data[1] . "'>" . $data[0] . "</a>",
-
-                                                          );
-
-                                                          wp_update_post($data);
-                                                      }else{
-                                                          echo "<h1>Already Exist</h1>";
-                                                      }
-
-                                                        echo "<br/></pre>";
-                                                    }
-
-                                                    //End Post Search
-                    echo "</div>";
-                                                    */?>
-
-                    <?php /*}*/?>
-                    <?php
-                    /*                        }
-                                            */?>
                 </div>
                 <style>
                     .Sectionh3{
@@ -634,30 +545,22 @@ echo "<div id='mainCont'>";
 
                 </style>
                 <?php
-                /*            }
 
-                                */
 
                 fclose($CSVfp);
             }
 
-//var_dump($Silos);
             for ($C = 0; $C <= count($Silos) - 1 ; $C++) {
 
-//                        var_dump($Silos);
-//$C++;
-//exit();
+
                 ?>
 <div class="acardeon">
                 <h3 onclick="jQuery(this).parent().toggleClass('close_acar');" class="TitleBarAcar" style="min-width:70%;color:white;background-color: #ffffff70;width: auto;display: inline;color: black;padding: 7px;box-shadow: 0 0 15px 1px inset #2d2d2d;border-radius: 10px;padding-left: 30px;padding-right: 30px;border: 1px solid #333;display: inline-flex;line-height: 1.8;text-shadow: 0px 0px 9px black;color: honeydew;"><img src="https://www.iconpacks.net/icons/2/free-arrow-down-icon-3101-thumb.png" style="max-height: 30px;margin-right: 30px;filter: blur(0pt);"><img src="https://www.iconpacks.net/icons/2/free-arrow-down-icon-3101-thumb.png" style="max-height: 30px;margin-right: 30px;filter: blur(1.5pt) brightness(100%) contrast(100%);margin-left: -60px;">
                     <?= $Silos[$C][0]?>>
                 </h3>
                     <?php
-//echo '<h3 style="color:white;"> ' . $Silos[$C][0] . '</h3>' ;
-//                    echo "<p>";
                 foreach ($Silo_Post[$C] as $SlavePID)
                 {
-//                        echo " " .  $SlavePID . "  ";
 
                     foreach ($Silo_Post[$C] as $MasterPID)
                     {
@@ -666,9 +569,7 @@ echo "<div id='mainCont'>";
                         echo "<p style=\"margin-left: 10%;text-align: left;max-width: 60%;margin-left: 30%;\" >==> $STitle </p>";
 
                    $post_Link=get_permalink($MasterPID);
-//                            echo "<p>adding " . $Title . " to " . $SlavePID . "</p>";
                         $CurrentMeta= get_post_meta($SlavePID,'linkedTO',true);
-                        //                            update_post_meta($SlavePID, "linkedTO",$CurrentMeta . '|' .$MasterPID . ";" .$Silos[$C][2] . ";".$Silos[$C][1]);
 
                         update_post_meta($SlavePID, "linkedTO",$CurrentMeta . '|' .$MasterPID . ";" .$Silos[$C][2] . ";".$Silos[$C][1]);
                     }
@@ -678,7 +579,6 @@ echo "<div id='mainCont'>";
 
                     foreach ($Silo_Post[count($Silos) - 1] as $SlavePID)
                     {
-//                        echo " " .  $SlavePID . "  ";
 
                         foreach ($Silo_Post[$C] as $MasterPID)
                         {
@@ -687,11 +587,8 @@ echo "<div id='mainCont'>";
                             echo "<p style=\"margin-left: 10%;text-align: left;max-width: 60%;margin-left: 30%;\" >==> $STitle </p>";
 
                             $post_Link=get_permalink($MasterPID);
-//                            echo "<p>adding " . $MasterPID . " to " . $SlavePID . "</p>";
                             $CurrentMeta= get_post_meta($SlavePID,'linkedTO',true);
-//                            update_post_meta($SlavePID, "linkedTO",$CurrentMeta . '|' .$MasterPID . ";" .$Silos[$C][2] . ";".$Silos[$C][1]);
                             update_post_meta($SlavePID, "linkedTO",$CurrentMeta . '|' .$MasterPID . ";" .$post_Link . ";".$Title);
-//echo get_post_meta($SlavePID,'linkedTO',true);
                         }
                     }
 
@@ -701,7 +598,6 @@ echo "<div id='mainCont'>";
 
                         foreach ($Silo_Post[$C - 1] as $SlavePID)
                         {
-//                            echo " " .  $SlavePID . "  ";
 
                             foreach ($Silo_Post[$C] as $MasterPID)
                             {
@@ -711,15 +607,12 @@ echo "<div id='mainCont'>";
 
 
                                 $post_Link=get_permalink($MasterPID);
-//                                echo "<p>adding " . $MasterPID . " to " . $SlavePID . "</p>";
                                 $CurrentMeta= get_post_meta($SlavePID,'linkedTO',true);
-                            //    update_post_meta($SlavePID, "linkedTO",$CurrentMeta . '|' .$MasterPID . ";" .$Silos[$C][2] . ";".$Silos[$C][1]);
                                 update_post_meta($SlavePID, "linkedTO",$CurrentMeta . '|' .$MasterPID . ";" .$post_Link . ";".$Title);
 
                             }
                         }
                 }
-//                echo "<span style='color: blue'> <B>$C</B>".$Silos[$C][0]  . "  </span>";
 
 
                 if (!isset($Silos[$C + 1][0])){
@@ -728,7 +621,6 @@ echo "<div id='mainCont'>";
 
                     foreach ($Silo_Post[0] as $SlavePID)
                     {
-//                        echo " " .  $SlavePID . "  ";
 
                         foreach ($Silo_Post[$C] as $MasterPID)
                         {
@@ -737,9 +629,7 @@ echo "<div id='mainCont'>";
                             echo "<p style=\"margin-left: 10%;text-align: left;max-width: 60%;margin-left: 30%;\" >==> $STitle </p>";
 
                             $post_Link=get_permalink($MasterPID);
-//                            echo "<p>adding " . $MasterPID . " to " . $SlavePID . "</p>";
                             $CurrentMeta= get_post_meta($SlavePID,'linkedTO',true);
-                         //   update_post_meta($SlavePID, "linkedTO",$CurrentMeta . '|' .$MasterPID . ";" .$Silos[$C][2] . ";".$Silos[$C][1]);
                             update_post_meta($SlavePID, "linkedTO",$CurrentMeta . '|' .$MasterPID . ";" .$post_Link . ";".$Title);
 
 
@@ -754,7 +644,6 @@ echo "<div id='mainCont'>";
 
                     foreach ($Silo_Post[$C + 1] as $SlavePID)
                     {
-//                        echo " " .  $SlavePID . "  ";
 
                         foreach ($Silo_Post[$C] as $MasterPID)
                         {
@@ -763,9 +652,7 @@ echo "<div id='mainCont'>";
                             echo "<p style=\"margin-left: 10%;text-align: left;max-width: 60%;margin-left: 30%;\" >==> $STitle </p>";
 
                             $post_Link=get_permalink($MasterPID);
-//                            echo "<p>adding " . $MasterPID . " to " . $SlavePID . "</p>";
                             $CurrentMeta= get_post_meta($SlavePID,'linkedTO',true);
-                          //  update_post_meta($SlavePID, "linkedTO",$CurrentMeta . '|' .$MasterPID . ";" .$Silos[$C ][2] . ";".$Silos[$C][1]);
                             update_post_meta($SlavePID, "linkedTO",$CurrentMeta . '|' .$MasterPID . ";" .$post_Link . ";".$Title);
 
 
@@ -775,27 +662,12 @@ echo "<div id='mainCont'>";
 
                       }
 
-//var_dump($Silos);
-//                echo "</p><hr><hr><hr><hr>";
-//                var_dump($Silo_Post[$C]);
+
 
 ?>
 
 
                 <?php
-//                    echo "<p style='color: blue'> $C :<BR>".var_dump( $Silos[1 ][0]) . " + 1 </p>";
-//                    echo "<p style='color: blue'> $C :<BR>".var_dump( $Silos->{2}[0]) . " + 1 </p>";
-//                    echo "<p style='color: blue'> $C :<BR>".var_dump( $Silos[3][0]) . " + 1 </p>";
-//                    echo "<p style='color: blue'> $C : <br>".$Silos->{intval($C)}[0]. "  </p>";
-
-
-
-                /* foreach ($silo as $item2) {
-//                            echo "<pre>". var_dump($item2['SearchPhrase']) ."<pre>";
-//                        echo "<h1>". $item2['SearchPhrase'] . '</h1>';
-
-                 }*/
-                // $C++;
 echo '</div>';
             }
             $pidList='';
@@ -804,9 +676,7 @@ echo '</div>';
                 foreach ($Silo_Post[$C] as $pid) {
                     $pidList .= $pid . ",";
                     $CurrentMeta= get_post_meta($pid,'linkedTO',true);
-//                    echo  '<br>Before= "' .$pid ."=". $CurrentMeta.'"';
                     update_post_meta($pid, "linkedTO",$CurrentMeta . '**');
-//echo  '<br>After="'.$pid ."=".get_post_meta($pid,'linkedTO',true) . "\"";
                 }
 
 
@@ -818,8 +688,7 @@ echo '</div>';
             $OldOption = get_option('PostIds_LinkSilo');
             update_option('PostIds_LinkSilo',$OldOption . $pidList);
 
-//                echo "<pre>";var_dump($Silos);
-//                $gg=0;
+
         }
     }
     ?>
@@ -835,94 +704,6 @@ echo '</div>';
 
 Class SiloPro{
 
-    /*
-    function hello_dolly_get_lyric() {
-
-    }*/
-
-// This just echoes the chosen line, we'll position it later.
-    /*function hello_dolly() {
-
-    }*/
-
-
-
-// Now we set that function up to execute when the admin_notices action is called.
-//add_action( 'admin_notices', 'hello_dolly' );
-
-// We need some CSS to position the paragraph.
-    /*
-    function dolly_css()
-    {
-    //    var_dump(get_post_type());
-        if (get_post_type() === "event" ) {
-            //echo "<pre style='display: block!important;'>";
-
-            $myvals = get_post_meta(get_the_ID(), '_event_id', true);
-            //  var_dump( get_post_meta_by_id(16));
-            $Event = em_get_event($myvals);
-            $Ticket = em_get_event($myvals)->get_tickets();
-
-            $Location = em_get_event($myvals)->get_location();
-            //  var_dump($Location);
-    //    print_r($Ticket->tickets[1]);
-            //  var_dump($Ticket->get_first()->get_price());
-            //echo "</pre> <h1 style='display: block!important;'>".get_the_ID()."</h1>";
-
-
-            echo '    <script type="application/ld+json">
-        {
-          "@context": "https://schema.org",
-          "@type": "Event",
-          "location": {
-            "@type": "Place",
-            "address": {
-              "@type": "PostalAddress",
-              "addressLocality": "' . $Location->location_town . '",
-              "addressRegion": "' . $Location->location_region . '",
-              "postalCode": "' . $Location->location_postcode . '",
-              "streetAddress": "' . $Location->location_address . '"
-            },
-            "name": "' . $Location->location_name . '"
-          },
-          "name": "' . $Event->event_name . '",
-          "offers": {
-            "@type": "Offer",
-            "price": "' . $Ticket->get_first()->get_price() . '",
-            "priceCurrency": "USD",
-            "url": "' . $Event->get_permalink() . '"
-          },
-          "startDate": "' . $Event->event_start_date . 'T' . $Event->event_start_date . '",
-          "endDate": "' . $Event->event_end_date . 'T' . $Event->event_end_time . '",
-          "image": "' . $Event->get_image_url() . '",
-          "eventStatus": "' . $Event->event_status . '",
-          "description": "' . $Event->post_content_filtered . '"
-        }
-        </script>';
-            echo '
-                <script async src="https://www.googletagmanager.com/gtag/js?id=UA-132814464-1"></script>
-
-    <script>
-     jQuery(document).ready( function($){
-       jQuery(document).bind(\'em_booking_success\', function(data){
-          //add your custom tracking code below
-          <!-- Google tag (gtag.js) -->
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag(\'js\', new Date());
-
-      gtag(\'config\', \'UA-132814464-1\');
-
-       });
-     });
-    </script>';
-
-        }
-    }*/
-
-    /*
-
-    */
 
 }
 function upload_user_file( $file = array() ) {
@@ -1038,5 +819,6 @@ function afunction( $post, $new_title ) {
 
     wp_update_post( $post_update );
 }
+include_once ('live_editor.php');
+include_once ('file_history.php');
 ?>
- 
